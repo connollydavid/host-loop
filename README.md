@@ -15,12 +15,15 @@ banks through the composed gates and the operator's `goal accept` closes.
 
 ## Install
 
-An opencode `plugins` entry (the file URL of this repo's checkout, or the
-package name once published):
+An opencode `plugins` entry:
 
 ```json
-{ "plugins": ["file:///path/to/host-loop"] }
+{ "plugins": ["@connollydavid/host-loop"] }
 ```
+
+The published package declares `@opencode/schema` (auto-installed by opencode
+for npm plugin targets). A local file:// checkout of this repo also loads;
+without node_modules it falls back to a structural goal-RPC definition.
 
 `HOST_LIFECYCLE_BIN` overrides the `host-lifecycle` binary the verbs run
 through (fixtures pin it); `HOST_LOOP_MAX_ITERATIONS` and

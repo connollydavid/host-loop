@@ -95,12 +95,24 @@ function parseEmission(text: string) {
   }
 }
 
-// The structural goal RPC definition (public Rpc.PortableDefinition shape;
-// runtime keys off id and method names and passes input through verbatim).
-const GOAL_DEF: any = {
+// The goal RPC definition. The published package declares @opencode/schema
+// (auto-installed for npm plugin targets) and imports Goal.Definition
+// directly; a local file:// checkout with no node_modules falls back to the
+// structural definition (public Rpc.PortableDefinition shape; runtime keys
+// off id and method names and passes input through verbatim).
+const GOAL_DEF_STRUCTURAL: any = {
   id: "opencode.goal",
   methods: { get: { input: { type: "object" }, output: { type: "object" } } },
   events: { changed: { schema: { type: "object" } } },
+}
+
+async function goalDefinition(): Promise<any> {
+  try {
+    const mod: any = await import("@opencode/schema/goal")
+    return mod.Goal?.Definition ?? GOAL_DEF_STRUCTURAL
+  } catch {
+    return GOAL_DEF_STRUCTURAL
+  }
 }
 
 export interface NativeGoal {
@@ -154,6 +166,7 @@ export function makePlugin(io: LoopIo = defaultIo()) {
         console.error(`[host-loop] native goal command failed (${text.split(" ")[0]}): ${e}`)
       })
 
+    const GOAL_DEF = await goalDefinition()
     const rpcGoal = () => {
       try {
         return ctx.rpc?.(GOAL_DEF)

@@ -1,10 +1,16 @@
 {
-  "name": "host-loop",
+  "name": "@connollydavid/host-loop",
   "version": "0.1.0",
-  "description": "The opencode goal loop under host governance (plan/0106): the /host-goal family drives the host-lifecycle verbs, and the loop is the V2 autonomous coordinator's client.",
+  "description": "The opencode goal loop under host governance: the /host-goal family bridged onto opencode's native /goal, with the host verbs as the state authority and four mechanical belts.",
   "type": "module",
   "exports": {
     ".": "./index.ts",
     "./server": "./index.ts"
+  },
+  "dependencies": {
+    "@opencode/schema": "2.2.5"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
