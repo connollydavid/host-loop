@@ -28,4 +28,5 @@ jobs:
           cargo install --locked allium-cli@3.4.2 --root "$HOME/.local" || true
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - run: allium check host-loop.allium
+      - run: allium analyse host-loop.allium
       - run: host-lifecycle obligations host-loop.allium --tests . --strict-discharge
