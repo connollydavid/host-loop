@@ -5,8 +5,6 @@
 
 entity-fields.GoalSurface              => structural
 entity-fields.NativeGoal               => structural
-entity-fields.Tool                     => structural
-enum-comparable.ToolKind               => structural
 surface-actor.HostLoop                 => structural
 surface-provides.HostLoop              => structural
 transition-rejected.GoalSurface.state  => structural
@@ -37,4 +35,3 @@ rule-failure.CompleteClearsNative.1 => test:complete_banks_then_clears_the_nativ
 rule-failure.AcceptClosesHost.1     => test:a_refused_accept_drives_no_closure exercises=the refusal reached the session
 rule-failure.BeltPausesNative.1     => test:the_belts_hold_fire_on_a_paused_goal exercises=already stopped
 
-invariant.NoCompletionTool         => test:the_registry_never_provides_complete exercises=never provides complete

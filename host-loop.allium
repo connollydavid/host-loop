@@ -11,14 +11,6 @@
 -- the verbs' internals (spec'd beside host-lifecycle), the native coordinator
 -- itself (upstream's), and the tools' prompt contract (the A/B record).
 
-enum ToolKind {
-    -- The model-facing tool registry; there is no complete and never will be.
-    show
-    status
-    record
-    complete
-}
-
 entity GoalSurface {
     -- The host's tracked goal state, read through the verbs (v0.63.0: the
     -- composed gates close the work; the operator's acceptance closes the
@@ -44,11 +36,6 @@ entity NativeGoal {
         active -> cleared
         terminal: cleared
     }
-}
-
-entity Tool {
-    kind: ToolKind
-    provided: Boolean
 }
 
 given {
@@ -77,6 +64,10 @@ surface HostLoop {
     @guarantee BeltsAreMechanical
         -- The cap, the deadline, the NEEDS YOU stop, and the overwrite guard
         -- are counted, never judged; each pause prints its reason.
+    @guarantee NoCompletionTool
+        -- The tool registry carries goal_show, tasks_status, and tasks_record
+        -- only; a model-facing complete does not exist and never will (the
+        -- suite pins the registry).
     @guarantee NoPersistentState
         -- The plugin writes no persistent state; only the armed session's goal
         -- id and arming time, in memory.
@@ -129,9 +120,4 @@ rule BeltPausesNative {
     when: BeltFires(host)
     requires: native.status = active
     ensures: native.status = paused
-}
-
-invariant NoCompletionTool {
-    for t in Tools where t.kind = complete:
-        not t.provided
 }
