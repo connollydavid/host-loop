@@ -1,0 +1,31 @@
+name: CI
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+      - run: node --test suite.test.ts
+
+  obligations:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+      - name: install the gates
+        run: |
+          cargo install --locked --git https://github.com/connollydavid/host-lifecycle --rev 9af1435678d2577be1be2c23cea929e7b14bb9e2 --root "$HOME/.local"
+          cargo install --locked allium-cli@3.4.2 --root "$HOME/.local" || true
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - run: allium check host-loop.allium
+      - run: host-lifecycle obligations host-loop.allium --tests . --strict-discharge
