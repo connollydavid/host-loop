@@ -54,6 +54,12 @@ surface HostLoop {
         -- The tool registry carries goal_show, tasks_status, and tasks_record
         -- only; a model-facing complete does not exist and never will (the
         -- suite pins the registry).
+    @guarantee DoctrineRidesContext
+        -- The compact doctrine tail (the exact record command, the
+        -- never-invent rule, the NEEDS YOU rule) rides the request context
+        -- near the tail while the native goal is active and the reminder is
+        -- enabled: injected in place, persisting nothing, admitting no turn;
+        -- suppressed when the recent window already carries the command.
     @guarantee BeltsAreMechanical
         -- The cap, the deadline, the NEEDS YOU stop, and the overwrite guard
         -- are counted, never judged; each pause prints its reason.

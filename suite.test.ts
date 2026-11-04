@@ -43,6 +43,7 @@ function fakeCtx(nativeGoal: { id: string; status: string; rounds: number } | nu
   const goalCommands: { name: string; text: string }[] = []
   const prompts: any[] = []
   const changedHandlers: ((ev: any) => void)[] = []
+  const contextHooks: Record<string, (event: any) => Promise<void>> = {}
   const ctx = {
     location: { directory: "/fixture" },
     tool: { transform: async (cb: any) => cb({ add: (t: any) => tools.push(t) }) },
@@ -53,13 +54,16 @@ function fakeCtx(nativeGoal: { id: string; status: string; rounds: number } | nu
         return {}
       },
       prompt: async (m: any) => prompts.push(m),
+      hook: async (name: string, cb: (event: any) => Promise<void>) => {
+        contextHooks[name] = cb
+      },
     },
     rpc: () => ({
       get: async () => nativeGoal,
       events: { on: (_ev: string, cb: (ev: any) => void) => changedHandlers.push(cb) },
     }),
   }
-  return { ctx, tools, commands, goalCommands, prompts, changedHandlers }
+  return { ctx, tools, commands, goalCommands, prompts, changedHandlers, contextHooks }
 }
 
 function emission() {
@@ -307,6 +311,72 @@ const suite = {
       const f = await boot(null, { failAccept: true })
       await f.goal.execute({ sessionID: "s1", prompt: { text: "accept plan/0001-smoke" } })
       assert.match(f.prompts.at(-1).text, /nothing-to-accept/, "the refusal reached the session")
+    })()
+  },
+
+  the_reminder_rides_the_context_hook() {
+    // plan/0110: enabled, native goal active, window without the record
+    // command: the doctrine tail injects near the context tail, in place,
+    // persisting nothing and admitting no turn.
+    return (async () => {
+      const f = fakeIo(ready)
+      const c = fakeCtx(activeGoal)
+      c.ctx.options = { reminder: true }
+      await makePlugin(f.io).setup(c.ctx)
+      const hook = c.contextHooks["context"]
+      assert.ok(hook, "the context hook registered")
+      const msgs = [
+        { role: "user", parts: [{ type: "text", text: "earlier" }] },
+        { role: "assistant", parts: [{ type: "text", text: "working" }] },
+      ]
+      await hook({ sessionID: "s1", messages: msgs })
+      assert.equal(msgs.length, 3, "one message injected")
+      const injected = msgs.at(-1)
+      assert.equal(injected.role, "user")
+      assert.match(JSON.stringify(injected), /tasks --record/, "the reminder carries the exact command")
+      assert.match(JSON.stringify(injected), /Never invent a command/, "the reminder carries the doctrine")
+    })()
+  },
+
+  the_reminder_suppresses_when_the_window_carries_the_command() {
+    // No stacking: when the recent window already carries the record
+    // command, nothing injects.
+    return (async () => {
+      const f = fakeIo(ready)
+      const c = fakeCtx(activeGoal)
+      c.ctx.options = { reminder: true }
+      await makePlugin(f.io).setup(c.ctx)
+      const msgs = [
+        { role: "assistant", parts: [{ type: "text", text: "ran it" }] },
+        { role: "user", parts: [{ type: "text", text: "host-lifecycle tasks --record plan/0001#smoke --disposition done --evidence ok ." }] },
+      ]
+      await c.contextHooks["context"]({ sessionID: "s1", messages: msgs })
+      assert.equal(msgs.length, 2, "nothing injected over a carrying window")
+    })()
+  },
+
+  the_reminder_stays_silent_unless_active_and_enabled() {
+    // Disabled by default; silent when the native goal is paused or absent:
+    // the reminder is an aid to the active loop only.
+    return (async () => {
+      const f = fakeIo(ready)
+      const c = fakeCtx(activeGoal)
+      await makePlugin(f.io).setup(c.ctx)
+      const msgs = [{ role: "user", parts: [{ type: "text", text: "x" }] }]
+      await c.contextHooks["context"]({ sessionID: "s1", messages: msgs })
+      assert.equal(msgs.length, 1, "silent when disabled (the default)")
+      const c2 = fakeCtx({ id: "g1", status: "paused", rounds: 1 })
+      c2.ctx.options = { reminder: true }
+      await makePlugin(fakeIo(ready).io).setup(c2.ctx)
+      const msgs2 = [{ role: "user", parts: [{ type: "text", text: "x" }] }]
+      await c2.contextHooks["context"]({ sessionID: "s1", messages: msgs2 })
+      assert.equal(msgs2.length, 1, "silent when paused")
+      const c3 = fakeCtx(null)
+      c3.ctx.options = { reminder: true }
+      await makePlugin(fakeIo(ready).io).setup(c3.ctx)
+      const msgs3 = [{ role: "user", parts: [{ type: "text", text: "x" }] }]
+      await c3.contextHooks["context"]({ sessionID: "s1", messages: msgs3 })
+      assert.equal(msgs3.length, 1, "silent when no native goal")
     })()
   },
 }

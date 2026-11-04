@@ -222,6 +222,44 @@ export function makePlugin(io: LoopIo = defaultIo()) {
     } catch {
       // The interval below carries the belts alone.
     }
+
+    // The doctrine reminder (plan/0110): the compact doctrine tail injected
+    // into the request context near the tail, before each model request,
+    // WITHOUT persisting a message and WITHOUT admitting a turn — the same
+    // context-hook surface the native goal plugin uses for its
+    // post-compaction objective reminder. Suppressed when the recent window
+    // already carries the record command (no stacking), when the native goal
+    // is not active, and unless enabled (options.reminder /
+    // HOST_LOOP_REMINDER); the A/B ship gate decides the default.
+    const reminderOn =
+      optionsInt(ctx.options, "reminder").has ||
+      process.env.HOST_LOOP_REMINDER === "1"
+    const REMINDER = [
+      "Record each done task with the exact command, passing the verify output:",
+      "ACTION: $ host-lifecycle tasks --record <the task key> --disposition done --evidence <the verify output> .",
+      "Never invent a command or a flag; never hand-edit a state file.",
+      "NEEDS YOU non-none means ask the operator and run nothing.",
+    ].join("\n")
+    try {
+      await ctx.session.hook?.("context", async (event: any) => {
+        if (!reminderOn) return
+        const sessionID = event?.sessionID
+        if (typeof sessionID !== "string") return
+        const goal = await getNative(sessionID)
+        if (!goal || goal.status !== "active") return
+        const msgs: any[] = event.messages ?? []
+        const window = JSON.stringify(msgs.slice(-6))
+        if (window.includes("tasks --record")) return
+        const reminderMsg = {
+          role: "user",
+          parts: [{ type: "text", text: `[host-loop reminder]\n${REMINDER}` }],
+        }
+        const at = msgs.at(-1)?.role === "user" ? msgs.length - 1 : msgs.length
+        msgs.splice(at, 0, reminderMsg)
+      })
+    } catch {
+      // The reminder is an aid, never a dependency.
+    }
     const beltTimer = setInterval(() => {
       for (const sessionID of createdId.keys()) void runBelts(sessionID)
     }, 60_000)
