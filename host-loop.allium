@@ -1,41 +1,30 @@
 -- allium: 3
--- The host-loop plugin, realigned onto opencode's native /goal (plan/0109).
--- Three separations, restated for the realignment: the native coordinator is
--- the only controller (this plugin registers no idle hook and sends no
--- continuations); the tracked surfaces are the only state authority (the
--- verbs write receipts, the Status line, GOAL.md; the plugin writes nothing of
--- the sort); the host verifier stack is the sole verifier (the native
--- reviewer decides only whether another turn fires, and a wrong done writes
--- nothing here).
--- Scope: the bridge (verbs to native lifecycle) and the four belts. Excludes:
--- the verbs' internals (spec'd beside host-lifecycle), the native coordinator
--- itself (upstream's), and the tools' prompt contract (the A/B record).
+-- The host-loop component (plan/0109): the bridge from the host goal verbs
+-- onto opencode's native /goal coordinator, and the four belts. Three
+-- separations: the native coordinator is the only controller (this plugin
+-- registers no idle hook and sends no continuations); the tracked surfaces
+-- are the only state authority (the verbs write the receipts, the Status
+-- line, GOAL.md; the plugin writes nothing of the sort); the host verifier
+-- stack is the sole verifier (the native reviewer decides only whether
+-- another turn fires, and a wrong done writes nothing here).
+-- No transitions machines are declared, deliberately: park/unpark is a real
+-- cycle in both surfaces, and this spec states the verb mapping (rules over
+-- these fields), not the topology.
+-- Scope: the bridge and the belts. Excludes: the verbs' internals (spec'd
+-- beside host-lifecycle), the native coordinator itself (upstream's), and the
+-- tools' prompt contract (the A/B record carries it).
 
 entity GoalSurface {
-    -- The host's tracked goal state, read through the verbs (v0.63.0: the
-    -- composed gates close the work; the operator's acceptance closes the
-    -- goal).
+    -- The host's tracked goal state (v0.63.0: the composed gates close the
+    -- work; the operator's acceptance closes the goal).
     state: active | parked | complete_pending | absent
-    transitions state {
-        absent -> active
-        active -> parked
-        parked -> active
-        active -> complete_pending
-        complete_pending -> absent
-        terminal: absent
-    }
 }
 
 entity NativeGoal {
-    -- The native /goal object, driven through the same command surface the
-    -- TUI widget uses. Its status is a driver detail, never the record.
-    status: active | paused | cleared
-    transitions status {
-        active -> paused
-        paused -> active
-        active -> cleared
-        terminal: cleared
-    }
+    -- The session's native-goal slot, driven through the same command surface
+    -- the TUI widget uses. A cleared storage reads as none; the slot's status
+    -- is a driver detail, never the record.
+    status: none | active | paused
 }
 
 given {
@@ -56,30 +45,28 @@ surface HostLoop {
         -- The plugin registers no idle hook and sends no continuations; the
         -- native coordinator alone decides when a turn fires.
     @guarantee TrackedSurfacesAreTheAuthority
-        -- Every state change lands through the verbs; the native object is
+        -- Every state change lands through the verbs; the native slot is
         -- driven to match, never read as the record.
     @guarantee WrongDoneWritesNothing
         -- A native reviewer done is a recoverable stop; it writes nothing to
         -- the receipts, the Status line, or GOAL.md.
-    @guarantee BeltsAreMechanical
-        -- The cap, the deadline, the NEEDS YOU stop, and the overwrite guard
-        -- are counted, never judged; each pause prints its reason.
     @guarantee NoCompletionTool
         -- The tool registry carries goal_show, tasks_status, and tasks_record
         -- only; a model-facing complete does not exist and never will (the
         -- suite pins the registry).
+    @guarantee BeltsAreMechanical
+        -- The cap, the deadline, the NEEDS YOU stop, and the overwrite guard
+        -- are counted, never judged; each pause prints its reason.
     @guarantee NoPersistentState
-        -- The plugin writes no persistent state; only the armed session's goal
-        -- id and arming time, in memory.
-    @guarantee HonestTelemetry
-        -- What the plugin reports is what the verbs and the goal rpc said.
+        -- The plugin writes no persistent state; only the armed session's
+        -- goal id and arming time, in memory.
 }
 
 -- === The bridge ===
 
 rule SetArmsBoth {
     when: HostGoalSet(host)
-    requires: host.state = absent
+    requires: host.state = absent and native.status = none
     ensures: host.state = active
     ensures: native.status = active
 }
@@ -98,11 +85,18 @@ rule UnparkResumesBoth {
     ensures: native.status = active
 }
 
+rule UnparkRearmsAfterClear {
+    when: HostGoalUnparked(host)
+    requires: host.state = parked and native.status = none
+    ensures: host.state = active
+    ensures: native.status = active
+}
+
 rule CompleteClearsNative {
     when: HostGoalCompleted(host)
     requires: host.state = active
     ensures: host.state = complete_pending
-    ensures: native.status = cleared
+    ensures: native.status = none
 }
 
 rule AcceptClosesHost {
@@ -115,7 +109,7 @@ rule AcceptClosesHost {
 
 -- One pause outcome for all four mechanical reasons: the round cap, the
 -- wall-clock deadline, the NEEDS YOU stop, and the native-overwrite guard.
--- Each fires only on an active native goal.
+-- Each fires only on an armed native goal.
 rule BeltPausesNative {
     when: BeltFires(host)
     requires: native.status = active
